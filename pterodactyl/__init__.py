@@ -26,66 +26,37 @@ class Base():
 
         return self.public_key + '.' + hash_b64.decode('utf8')
 
-    def list_user(self, id=None, email=None):
-        users = self.list_users()
-        data = {
-            "email": None,
-            "username": None,
-            "name_first": None,
-            "name_last": None,
-            "root_admin": None,
-            "uuid": None,
-            "id": None
-        }
-        for user in users:
-            if str(email) == user.email or str(id) == user.id:
-                data["email"] = user.email
-                data["username"] = user.username
-                data["name_first"] = user.name_first
-                data["name_last"] = user.name_last
-                data["root_admin"] = user.root_admin
-                data["uuid"] = user.uuid
-                data["id"] = user.id
-                return data
-        return "User not found"
-
     def list_users(self, id=None):
 
         url = self.hostname + "/admin/users"
         if id:
             url += "/" + str(id)
         r = requests.get(url, headers={'Authorization': 'Bearer ' + self.auth(url)})
+        json_raw = r.json()
+
+        if id:
+            return User.from_json(json_raw['data'])
 
         users = []
-        for user_raw in r.json()['data']:
-            user = User() # tühi User klassi instance mis ei tea veel sittagi
-            user.email = user_raw['attributes']['email']
-            user.username = user_raw['attributes']['username']
-            user.name_first = user_raw['attributes']['name_first']
-            user.name_last = user_raw['attributes']['name_last']
-            user.root_admin = user_raw['attributes']['root_admin']
-            user.uuid = user_raw['attributes']['uuid']
-            #user.password = user_raw['attributes']['password']
-            user.id = user_raw['id']
-            # TODO:... muud andmed lisada
-
-            users.append(user)  # User klassi instance on täidetud andmetega
+        for user_raw in json_raw['data']:
+            users.append(User.from_json(user_raw))  # User klassi instance on täidetud andmetega
         return users
 
-    def create_user(self):
+    def create_user(self, user):
 
         url = self.hostname + "/admin/users"
         values = {
-            "email": email,
-            "username": username,
-            "name_first": name_first,
-            "name_last": name_last,
-            "root_admin": root_admin
+            "email": user.email,
+            "username": user.username,
+            "name_first": user.name_first,
+            "name_last": user.name_last,
+            "root_admin": user.root_admin
         }
-        if password:
-            values["password"] = password
-        if custom_id:
-            values["custom_id"] = custom_id
+        if user.password:
+            values["password"] = user.password
+        #  wut ?
+        if user.id:
+            values["custom_id"] = user.id
         body = json.dumps(values)
         r = requests.post(url, json=values, headers={'Authorization': 'Bearer ' + self.auth(url, body)})
 
@@ -106,6 +77,25 @@ class User():
         self.uuid = uuid
         self.id = id
 
+    @classmethod
+    def from_json(cls, data):
+        user = cls()  # tühi User klassi instance mis ei tea veel sittagi
+        user.email = data['attributes']['email']
+        user.username = data['attributes']['username']
+        user.name_first = data['attributes']['name_first']
+        user.name_last = data['attributes']['name_last']
+        user.root_admin = data['attributes']['root_admin']
+        user.uuid = data['attributes']['uuid']
+        # user.password = user_raw['attributes']['password']
+        user.id = data['id']
+        return user
+
+    def __str__(self):
+        return "<pterodactyl.User id={} username={} email={}>".format(self.id, self.username, self.email)
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class Server():
 
@@ -123,7 +113,7 @@ class Server():
         self.memory = memory
         self.swap = swap
         self.disk = disk
-        self.cpu = cpu
+        self.cpu = cpumc
         self.io = io
         self.service_id = service_id
         self.option_id = option_id
